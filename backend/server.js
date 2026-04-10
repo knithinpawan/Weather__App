@@ -11,11 +11,16 @@ const Weather = require("./models/Weather");
 const app = express();
 
 /* ---------------- MIDDLEWARE ---------------- */
-// Allow all origins for deployment (Render + Vercel frontend)
-app.use(cors());
+app.use(cors({
+  origin: "*"
+}));
 app.use(express.json());
 
-/* ---------------- SERVER ---------------- */
+/* ---------------- ENV ---------------- */
+const API_KEY = process.env.API_KEY;
+const PORT = process.env.PORT || 5000;
+
+/* ---------------- HTTP + SOCKET SERVER ---------------- */
 const server = http.createServer(app);
 
 const io = new Server(server, {
@@ -25,27 +30,21 @@ const io = new Server(server, {
   }
 });
 
-/* ---------------- ENV ---------------- */
-const API_KEY = process.env.API_KEY;
-const PORT = process.env.PORT || 5000;
-
 /* ---------------- MONGODB ---------------- */
 mongoose
   .connect(process.env.MONGO_URL)
   .then(() => console.log("MongoDB Connected ✅"))
   .catch((err) => console.log("Mongo Error:", err));
 
-/* ---------------- ROUTES ---------------- */
-
-// Home route
+/* ---------------- HOME ROUTE ---------------- */
 app.get("/", (req, res) => {
   res.send("Weather API Running ✅");
 });
 
-// Current weather + save
+/* ---------------- CURRENT WEATHER ---------------- */
 app.get("/api/weather/fetch/:city", async (req, res) => {
   try {
-    const city = req.params.city;
+    const city = req.params.city.trim();
 
     const response = await axios.get(
       `https://api.openweathermap.org/data/2.5/weather?q=${city}&appid=${API_KEY}&units=metric`
@@ -63,17 +62,21 @@ app.get("/api/weather/fetch/:city", async (req, res) => {
 
     await weather.save();
 
+    // emit real-time update
+    io.emit("weatherUpdate", weather);
+
     res.json(weather);
+
   } catch (err) {
     console.log(err.response?.data || err.message);
-    res.status(500).json({ message: "Weather fetch failed" });
+    res.status(404).json({ message: "City not found" });
   }
 });
 
-// 5-day forecast
+/* ---------------- 5 DAY FORECAST ---------------- */
 app.get("/api/weather/forecast/:city", async (req, res) => {
   try {
-    const city = req.params.city;
+    const city = req.params.city.trim();
 
     const response = await axios.get(
       `https://api.openweathermap.org/data/2.5/forecast?q=${city}&appid=${API_KEY}&units=metric`
@@ -81,42 +84,48 @@ app.get("/api/weather/forecast/:city", async (req, res) => {
 
     const list = response.data.list;
 
-    const daily = list
-      .filter((item) => item.dt_txt.includes("12:00:00"))
-      .slice(0, 5);
-
-    const forecast = daily.map((item) => ({
-      date: item.dt_txt.split(" ")[0],
-      temperature: item.main.temp,
-      description: item.weather[0].description,
-      icon: item.weather[0].icon
-    }));
+    const forecast = list
+      .filter(item => item.dt_txt.includes("12:00:00"))
+      .slice(0, 5)
+      .map(item => ({
+        date: item.dt_txt.split(" ")[0],
+        temperature: item.main.temp,
+        description: item.weather[0].description,
+        icon: item.weather[0].icon
+      }));
 
     res.json(forecast);
+
   } catch (err) {
-    console.log(err.message);
+    console.log(err.response?.data || err.message);
     res.status(500).json({ message: "Forecast failed" });
   }
 });
 
 /* ---------------- SOCKET.IO ---------------- */
 io.on("connection", (socket) => {
-  console.log("User Connected");
+  console.log("User Connected 🔵");
 
+  // search history feature
   socket.on("searchCity", async (query) => {
     try {
       const results = await Weather.find({
         city: { $regex: query, $options: "i" }
-      });
+      }).sort({ createdAt: -1 }).limit(10);
 
       socket.emit("searchResults", results);
+
     } catch (err) {
       console.log(err.message);
     }
+  });
+
+  socket.on("disconnect", () => {
+    console.log("User Disconnected 🔴");
   });
 });
 
 /* ---------------- START SERVER ---------------- */
 server.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+  console.log(`Server running on port ${PORT} 🚀`);
 });
