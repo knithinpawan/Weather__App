@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+ import React, { useState } from "react";
 import axios from "axios";
 import "./App.css";
 
@@ -7,19 +7,23 @@ function App() {
   const [weather, setWeather] = useState(null);
   const [forecast, setForecast] = useState([]);
 
-  /* ---------------- SEARCH ---------------- */
+  // ✅ DIRECT BACKEND URL
+  const BASE_URL = "https://weatherapp-serverside.onrender.com";
+
+  /* ---------------- SEARCH WEATHER ---------------- */
   const searchWeather = async () => {
     if (!city) return;
 
     try {
       const weatherRes = await axios.get(
-        `http://localhost:5000/api/weather/fetch/${city}`
+        `${BASE_URL}/api/weather/fetch/${city}`
       );
-      setWeather(weatherRes.data);
 
       const forecastRes = await axios.get(
-        `http://localhost:5000/api/weather/forecast/${city}`
+        `${BASE_URL}/api/weather/forecast/${city}`
       );
+
+      setWeather(weatherRes.data);
       setForecast(forecastRes.data);
     } catch (err) {
       console.log(err);
