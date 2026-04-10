@@ -2,8 +2,6 @@ import React, { useState } from "react";
 import axios from "axios";
 import "./App.css";
 
-const API = import.meta.env.VITE_API_URL;
-
 function App() {
   const [city, setCity] = useState("");
   const [weather, setWeather] = useState(null);
@@ -15,17 +13,14 @@ function App() {
 
     try {
       const weatherRes = await axios.get(
-        `${API}/api/weather/fetch/${city}`
+        `http://localhost:5000/api/weather/fetch/${city}`
       );
-
       setWeather(weatherRes.data);
 
       const forecastRes = await axios.get(
-        `${API}/api/weather/forecast/${city}`
+        `http://localhost:5000/api/weather/forecast/${city}`
       );
-
       setForecast(forecastRes.data);
-
     } catch (err) {
       console.log(err);
       alert("City not found or server error");
@@ -47,10 +42,10 @@ function App() {
           temperature: res.data.main.temp,
           humidity: res.data.main.humidity,
           wind: res.data.wind.speed,
-          description: res.data.weather[0].description
+          description: res.data.weather[0].description,
         });
-
-      } catch {
+      } catch (err) {
+        console.log(err);
         alert("Location error");
       }
     });
